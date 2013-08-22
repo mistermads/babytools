@@ -7,11 +7,12 @@ addpath('../matlab/original/');
 % C3D Qualisys
 %[raw_c3d,markernames,units] = baby_load_c3d(FETCH_c3dfil);
 fname = 'N30_04';
-load(['../data/' fname]);  
+matraw = load(['../data/' fname]);  
+eval(['matraw = matraw.' fname]);
 fps = 60;
 markerindex = 2;    % 1...32 
 smoothpnts = 5;
-speed = aux_velocity(N30_04,fps,markerindex,smoothpnts);
+speed = aux_velocity(matraw,fps,markerindex,smoothpnts);
 
 % NOTE
 % IGNORE for now! correction factor for miscalibrated data
@@ -21,7 +22,7 @@ raw_qualisys = baby_qualisys_speed(speed);
 
 
 % USER params: set default here
-minvelocity = 200;
+minvelocity = 8;      % default: 200
 minpauseframes = 12;
 minpeaksinunit = 1;
 minunitframes = 12;
