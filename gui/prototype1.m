@@ -22,7 +22,7 @@ function varargout = prototype1(varargin)
 
 % Edit the above text to modify the response to help prototype1
 
-% Last Modified by GUIDE v2.5 22-Aug-2013 12:19:37
+% Last Modified by GUIDE v2.5 23-Aug-2013 18:24:05
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -57,6 +57,7 @@ handles.output = hObject;
 
 % General properties
     handles.precision = 2;      % number of decimal places in frame2msec conversion 
+    handles.WANDfactor = 1;     % default value for WAND correction factor 
 
 % Update handles structure
 guidata(hObject, handles);
@@ -85,6 +86,8 @@ function pushbuttoncomp_Callback(hObject, eventdata, handles)
 % compute speed/velocity
 speed = aux_velocity(handles.rawdata,handles.Framerate,...
     handles.MarkerIndex,handles.smoothpnts);
+% WAND correction factor for miscalibrated data
+speed = speed/handles.WANDfactor;
 handles.speed = speed;
 raw_qualisys = baby_qualisys_speed(speed);
 handles.raw_qualisys = raw_qualisys;
@@ -121,7 +124,7 @@ function fillOutputpanel(hObject, handles)
 % sets up the file summary and initializes the export options
 
 % ADD choice between frames/ms
-%% fill Table with data
+%% fill 'niceData' Table with processed data
 % DataColumnNames
 var_names = {'Startframes','Endframes','Eventbla'};
 % Data
@@ -141,23 +144,34 @@ handles.startframes = startframes;
 handles.endframes = endframes;
 handles.eventstates = eventstates;
 
+%% fill 'rawdata' table with unprocessed data
+set(handles.uitableresultsraw,'Data',handles.seq_qs);
+
 %% show file summary
-% make cell arrays for properties and their respective names
+% make cell arrays for properties and their respective names and units
 filesum_propertynames = {'Pathname', 'Filename','Original Path and Filename' ...
     'Framerate', 'Frames','', 'MarkerLabel', 'Smoothingpoints','',...
-    'Minimum Velocity', 'Minimum Pause', 'Minimum Peaks', 'Minimum Frames'};
+    'Minimum Velocity', 'Minimum Pause', 'Minimum Peaks', 'Minimum Unit Frames'};
 filesum_properties = {handles.PathName, handles.FileName, handles.rawdata.File, ...
     num2str(handles.Framerate), num2str(handles.Frames),'', handles.MarkerLabel,...
     num2str(handles.smoothpnts),'',num2str(handles.minVelo),...
     num2str(handles.minPause), num2str(handles.minPeaks), num2str(handles.minFrames)};
-
+filesum_propertyunits = {'','','',' fps',' Frame(s)','', '',' Frame(s)','',' mm/s',' Frame(s)',' /unit',' Frame(s)'};
+% concatenate 'properties' and 'units' strings
+filesum_propertieswithunits = cell(length(filesum_properties),1);
+for kk=1:length(filesum_properties)
+    filesum_propertieswithunits{kk} = [filesum_properties{kk} filesum_propertyunits{kk}];
+end
 % display on outputpanel
 
 set(handles.textfilesummarypropertynames,'String',filesum_propertynames([2 4:end]));    % (2:end) to leave out pathname
-set(handles.textfilesummaryproperties,'String',filesum_properties([2 4:end]));          % dto.
+%set(handles.textfilesummaryproperties,'String',filesum_properties([2 4:end]));          % dto.
+set(handles.textfilesummaryproperties,'String',filesum_propertieswithunits([2 4:end]));          % dto.
+% ADD unit string (maybe later)
+%set(handles.textfilesummaryproperties,'String',{[filesum_properties([2 4:end]); filesum_propertyunits([2 4:end]) ]});          % dto.
 
 % save for exportfile
-handles.filesummary = [filesum_propertynames; filesum_properties]';
+handles.filesummary = [filesum_propertynames; filesum_properties; filesum_propertyunits]';
 
 % Update handles structure
 guidata(hObject, handles);
@@ -269,9 +283,14 @@ function editMinVelo_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of editMinVelo as a double
 
  val = str2double(get(hObject,'String'));
-
-if val<=0
-    msgbox('Must be positive','Input error');
+if isnan(val)
+    errordlg('You must enter a numeric value','Bad Input','modal')
+    uicontrol(hObject)
+    return
+elseif val<=0
+    errordlg('You must enter a positive value','Bad Input','modal')
+    uicontrol(hObject)
+    return
 else
 handles.minVelo = val;
 end
@@ -304,14 +323,24 @@ function editMinPause_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of editMinPause as a double
  val = str2double(get(hObject,'String'));
 
-if val<0
-    msgbox('Must be positive','Input error');
-else
-handles.minPause = val;
-handles.minPausemsec = frames2msec(val, handles.Framerate, handles.precision);
-set(handles.textMinPausemseconds,'String',[num2str(handles.minPausemsec) ' ms']);
-
-end
+ if isnan(val)
+     errordlg('You must enter a numeric value','Bad Input','modal')
+     uicontrol(hObject)
+     return
+ elseif val<0
+     errordlg('You must enter a positive value','Bad Input','modal')
+     uicontrol(hObject)
+     return
+ elseif (mod(val,1)~=0)
+     errordlg('You must enter an integer value','Bad Input','modal')
+     uicontrol(hObject)
+     return
+ else
+     handles.minPause = val;
+     handles.minPausemsec = frames2msec(val, handles.Framerate, handles.precision);
+     set(handles.textMinPausemseconds,'String',[num2str(handles.minPausemsec) ' ms']);
+     
+ end
 % pass on data to GUI
 guidata(hObject,handles);
 
@@ -338,14 +367,22 @@ function editMinPeaks_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of editMinPeaks as text
 %        str2double(get(hObject,'String')) returns contents of editMinPeaks as a double
- val = str2double(get(hObject,'String'));
+val = str2double(get(hObject,'String'));
 
-if val<=0
-    msgbox('Must be positive','Input error');
-elseif ~isinteger(val)
-    msgbox('Must be integer','Input error');
+if isnan(val)
+    errordlg('You must enter a numeric value','Bad Input','modal')
+    uicontrol(hObject)
+    return
+elseif val<=0
+    errordlg('You must enter a positive value','Bad Input','modal')
+    uicontrol(hObject)
+    return
+elseif (mod(val,1)~=0)
+    errordlg('You must enter an integer value','Bad Input','modal')
+    uicontrol(hObject)
+    return
 else
-handles.minPeaks = val;
+    handles.minPeaks = val;
 end
 % pass on data to GUI
 guidata(hObject,handles);
@@ -375,8 +412,18 @@ function editMinFrames_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of editMinFrames as a double
  val = str2double(get(hObject,'String'));
 
-if val<=0
-    msgbox('Must be positive','Input error');
+ if isnan(val)
+    errordlg('You must enter a numeric value','Bad Input','modal')
+    uicontrol(hObject)
+    return
+elseif (mod(val,1)~=0)
+    errordlg('You must enter an integer value','Bad Input','modal')
+    uicontrol(hObject)
+    return
+ elseif val<=0
+    errordlg('You must enter a positive value','Bad Input','modal')
+    uicontrol(hObject)
+    return
 else
 handles.minFrames = val;
 handles.minFramesmsec = frames2msec(val, handles.Framerate, handles.precision);
@@ -460,9 +507,71 @@ export(handles.exportdata,'XLSfile',[path fname],'Sheet',1);
 warning off MATLAB:xlswrite:AddSheet;
 % add worksheets with properties
 xlswrite([path fname], handles.filesummary, 2);
+% add worksheet with 'raw' data
+xlswrite([path fname], handles.seq_qs, 3);
 % change names of the worksheets
-xlsheets({'Data','Properties'}, [path fname]);
+xlsheets({'Data','Properties','Raw Data'}, [path fname]);
 warning on MATLAB:xlswrite:AddSheet;
+end
+
+% pass on data to GUI
+guidata(hObject,handles);
+
+
+% --- Executes on button press in pushbuttonnicedata.
+function pushbuttonnicedata_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbuttonnicedata (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% set 'rawdata' table to invisible
+set(handles.uitableresultsraw,'Visible','off');
+
+% set 'nicedata' table to visible
+set(handles.uitableresults,'Visible','on');
+
+% enable 'rawdata' button
+set(handles.pushbuttonrawdata,'Enable','on');
+% disable 'nicedata' button
+set(handles.pushbuttonnicedata,'Enable','off');
+
+% pass on data to GUI
+guidata(hObject,handles);
+
+% --- Executes on button press in pushbuttonrawdata.
+function pushbuttonrawdata_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbuttonrawdata (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% set 'nicedata' table to invisible
+set(handles.uitableresults,'Visible','off');
+
+% set 'rawdata' table to visible
+set(handles.uitableresultsraw,'Visible','on');
+
+% enable 'nicedata' button
+set(handles.pushbuttonnicedata,'Enable','on');
+% disable 'rawdata' button
+set(handles.pushbuttonrawdata,'Enable','off');
+
+% pass on data to GUI
+guidata(hObject,handles);
+
+% --- Executes on button press in checkboxWANDcorr.
+function checkboxWANDcorr_Callback(hObject, eventdata, handles)
+% hObject    handle to checkboxWANDcorr (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of checkboxWANDcorr
+
+val = get(hObject,'Value');
+
+if val==0
+   handles.WANDfactor = 1; 
+else
+   handles.WANDfactor = 2.5;    % CHECK Is it always 2.5? Any way to check this?     
 end
 
 % pass on data to GUI
