@@ -22,7 +22,7 @@ function varargout = prototype1(varargin)
 
 % Edit the above text to modify the response to help prototype1
 
-% Last Modified by GUIDE v2.5 23-Aug-2013 18:24:05
+% Last Modified by GUIDE v2.5 26-Aug-2013 14:31:59
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -101,7 +101,7 @@ minunitframes = handles.minFrames;
 
  % sequencing % states: 1:false, 2:true
  [seq_qs,qs_statenames] = baby_velocitypeaks(raw_qualisys,minvelocity,minpauseframes,minpeaksinunit,minunitframes);
- % TO DO check this one! esp. 'emptymatch' (probably version too old)
+ % TO DO check this one! 
  [seq_qs,qs_statenames] = baby_seq_statenames_order(seq_qs,qs_statenames,{'','x'},{'^\s*$'},{'[xX]'});
 handles.seq_qs = seq_qs;
 handles.qs_statenames = qs_statenames;
@@ -121,12 +121,12 @@ function fillOutputpanel(hObject, handles)
 % FILLOUTPUTPANEL
 %
 % fills the outputpanel table with the data (as specified by ...)
-% sets up the file summary and initializes the export options
+% and sets up the file summary
 
-% ADD choice between frames/ms
+% ADD choice between frames/ms?
 %% fill 'niceData' Table with processed data
 % DataColumnNames
-var_names = {'Startframes','Endframes','Eventbla'};
+var_names = {'Startframe','Endframe','Event'};
 % Data
 startframes = handles.seq_qs(1:end-1,1);
 endframes = handles.seq_qs(2:end,1)-1;
@@ -136,6 +136,7 @@ eventstates = handles.seq_qs(1:end-1,2);
 
 tabledata = [startframes endframes eventstates];
 set(handles.uitableresults,'Data',tabledata);
+set(handles.uitableresults,'ColumnName',var_names);
 
 % add to handles NOTE: necessary???
 handles.tabledata = tabledata;
@@ -151,24 +152,21 @@ set(handles.uitableresultsraw,'Data',handles.seq_qs);
 % make cell arrays for properties and their respective names and units
 filesum_propertynames = {'Pathname', 'Filename','Original Path and Filename' ...
     'Framerate', 'Frames','', 'MarkerLabel', 'Smoothingpoints','',...
-    'Minimum Velocity', 'Minimum Pause', 'Minimum Peaks', 'Minimum Unit Frames'};
+    'Minimum Velocity', 'Minimum Pause', 'Minimum Peaks', 'Minimum Unit Length', 'WAND correction'};
 filesum_properties = {handles.PathName, handles.FileName, handles.rawdata.File, ...
     num2str(handles.Framerate), num2str(handles.Frames),'', handles.MarkerLabel,...
     num2str(handles.smoothpnts),'',num2str(handles.minVelo),...
-    num2str(handles.minPause), num2str(handles.minPeaks), num2str(handles.minFrames)};
-filesum_propertyunits = {'','','',' fps',' Frame(s)','', '',' Frame(s)','',' mm/s',' Frame(s)',' /unit',' Frame(s)'};
+    num2str(handles.minPause), num2str(handles.minPeaks), num2str(handles.minFrames),num2str(handles.WANDfactor)};
+filesum_propertyunits = {'','','',' fps',' Frame(s)','', '',' Frame(s)','',' mm/s',' Frame(s)',' per Unit',' Frame(s)',''};
 % concatenate 'properties' and 'units' strings
 filesum_propertieswithunits = cell(length(filesum_properties),1);
 for kk=1:length(filesum_properties)
     filesum_propertieswithunits{kk} = [filesum_properties{kk} filesum_propertyunits{kk}];
 end
-% display on outputpanel
 
-set(handles.textfilesummarypropertynames,'String',filesum_propertynames([2 4:end]));    % (2:end) to leave out pathname
-%set(handles.textfilesummaryproperties,'String',filesum_properties([2 4:end]));          % dto.
+% display on outputpanel
+set(handles.textfilesummarypropertynames,'String',filesum_propertynames([2 4:end]));    % (2 4:end) to leave out pathname and original path
 set(handles.textfilesummaryproperties,'String',filesum_propertieswithunits([2 4:end]));          % dto.
-% ADD unit string (maybe later)
-%set(handles.textfilesummaryproperties,'String',{[filesum_properties([2 4:end]); filesum_propertyunits([2 4:end]) ]});          % dto.
 
 % save for exportfile
 handles.filesummary = [filesum_propertynames; filesum_properties; filesum_propertyunits]';
@@ -213,65 +211,85 @@ function pushbuttonload_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % open dialog box for file retrieval
-[FileName,PathName,FilterIndex] = uigetfile('*.mat','Choose a File','../data'); 
+[FileName,PathName,FilterIndex] = uigetfile('*.mat','Choose a File','../data');
 
-% load selected file (later:incl load-options)
-rawdata = load([PathName FileName]); 
-FileName_short = FileName(1:end-4); % discarding the '.mat'
-eval(['rawdata = rawdata.' FileName_short]);
-
-% NOTE: ADD check for No/ invalid file, later
-
-% save info in handles struct
-handles.rawdata = rawdata;
-handles.PathName = PathName;
-handles.FileName = FileName;
-handles.FileName_short = FileName_short;
-handles.Framerate = rawdata.FrameRate;
-handles.Frames = rawdata.Frames;
-% NOTE! Ignoring Unlabeled/Discarded for now
-handles.NrOfMarkers = rawdata.Trajectories.Labeled.Count;
-handles.MarkerLabels = rawdata.Trajectories.Labeled.Labels;
-
-
-% show selected file, framerate and number of frames in textfields
-set(handles.textfname,'String',handles.FileName_short);
-set(handles.textfilefs,'String',[num2str(handles.Framerate) '/s']);
-set(handles.textfileframes,'String',handles.Frames);
-handles.minPausemsec = frames2msec(handles.minPause, handles.Framerate, handles.precision);
-set(handles.textMinPausemseconds,'String',[num2str(handles.minPausemsec) ' ms']);
-handles.minFramesmsec = frames2msec(handles.minFrames, handles.Framerate, handles.precision);
-set(handles.textMinFramesmseconds,'String',[num2str(handles.minFramesmsec) ' ms']);
-
-
-% set up and enable popupmenumarker
-set(handles.popupmenumarker,'Enable','on');
-set(handles.popupmenumarker,'String',handles.MarkerLabels);
-% for first loaded file, set to first element
-if ~isfield(handles, 'MarkerLabel')
-    handles.MarkerLabel = handles.MarkerLabels{handles.MarkerIndex};
-else
-    % match marker label of last file, if existing
-    handles.MarkerIndex = strmatch(handles.MarkerLabel, handles.MarkerLabels);
-    % if no matching label found, set to first element
-    if isempty(handles.MarkerIndex)
-        handles.MarkerIndex = 1;
-        handles.MarkerLabel = handles.MarkerLabels{handles.MarkerIndex};
+if FileName ~= 0 % check if a file is selected
+    
+    % load selected file
+    FileNameCell = strsplit(FileName,'.');  % split into name and file ending
+    FileName_short = FileNameCell{1}; % (name)
+    FileEnding = FileNameCell{2};   % 'mat'
+    if strcmp(FileEnding,'mat')~=1
+        warndlg('Please choose a .mat File!', 'Wrong File Type');
+    else
+        rawdata = load([PathName FileName]);
+        eval(['rawdata = rawdata.' FileName_short]);
+        
+        % NOTE: ADD check for invalid file, later
+        % --> a dozen of isfields...
+        
+        % save info in handles struct
+        handles.rawdata = rawdata;
+        handles.PathName = PathName;
+        handles.FileName = FileName;
+        handles.FileName_short = FileName_short;
+        handles.Framerate = rawdata.FrameRate;
+        handles.Frames = rawdata.Frames;
+        % Checking for Unlabeled/Discarded markers
+        handles.Unidentified = rawdata.Trajectories.Unidentified.Count;
+        handles.Discarded = rawdata.Trajectories.Discarded.Count;
+        if (handles.Unidentified~=0 || handles.Discarded~=0)   
+             warningstring = ['Data contains ' num2str(handles.Unidentified)...
+                 ' unidentified and ' num2str(handles.Discarded) ' discarded markers!'];
+            % warndlg(warningstring);       % No warning, just a textoutput
+            set(handles.textdisc_unident_markers,'String',warningstring);
+        else
+            set(handles.textdisc_unident_markers,'String','');
+       end
+        handles.NrOfMarkers = rawdata.Trajectories.Labeled.Count;
+        handles.MarkerLabels = rawdata.Trajectories.Labeled.Labels;
+        
+        
+        % show selected file, framerate and number of frames in textfields
+        set(handles.textfname,'String',handles.FileName_short);
+        set(handles.textfilefs,'String',[num2str(handles.Framerate) ' fps']);
+        set(handles.textfileframes,'String',handles.Frames);
+        handles.minPausemsec = frames2msec(handles.minPause, handles.Framerate, handles.precision);
+        set(handles.textMinPausemseconds,'String',[num2str(handles.minPausemsec) ' ms']);
+        handles.minFramesmsec = frames2msec(handles.minFrames, handles.Framerate, handles.precision);
+        set(handles.textMinFramesmseconds,'String',[num2str(handles.minFramesmsec) ' ms']);
+        
+        
+        % set up and enable popupmenumarker
+        set(handles.popupmenumarker,'Enable','on');
+        set(handles.popupmenumarker,'String',handles.MarkerLabels);
+        % for first loaded file, set to first element
+        if ~isfield(handles, 'MarkerLabel')
+            handles.MarkerLabel = handles.MarkerLabels{handles.MarkerIndex};
+        else
+            % match marker label of last file, if existing
+            handles.MarkerIndex = strmatch(handles.MarkerLabel, handles.MarkerLabels);
+            % if no matching label found, set to first element
+            if isempty(handles.MarkerIndex)
+                handles.MarkerIndex = 1;
+                handles.MarkerLabel = handles.MarkerLabels{handles.MarkerIndex};
+            end
+            handles.MarkerLabel = handles.MarkerLabels{handles.MarkerIndex};
+            set(handles.popupmenumarker,'Value',handles.MarkerIndex);
+        end
+        
+        % enable pushbuttoncompute
+        set(handles.pushbuttoncomp,'Enable','on');
+        
+        % enable pushbuttoncompute
+        set(handles.pushbuttonExport,'Enable','on');
+        
+        % pass on data to GUI
+        guidata(hObject,handles);
+        % execute Compute callback when a new file is loaded
+        pushbuttoncomp_Callback(hObject, eventdata, handles);
     end
-    handles.MarkerLabel = handles.MarkerLabels{handles.MarkerIndex};
-    set(handles.popupmenumarker,'Value',handles.MarkerIndex);
 end
-
-% enable pushbuttoncompute
-set(handles.pushbuttoncomp,'Enable','on');
-
-% enable pushbuttoncompute
-set(handles.pushbuttonExport,'Enable','on');
-
-% pass on data to GUI
-guidata(hObject,handles);
-% execute Compute callback when a new file is loaded
-pushbuttoncomp_Callback(hObject, eventdata, handles);
 
 
 function editMinVelo_Callback(hObject, eventdata, handles)
@@ -491,70 +509,40 @@ function pushbuttonExport_Callback(hObject, eventdata, handles)
 if 0 % save as .mat
 elseif 1 % save as .xls
     
-% ADD change to 'dataset' have input for 'event' (3rd column) as text
-handles.exportdata = dataset({handles.tabledata,...
-    'Startframe', 'Endframe', 'Event'});
-    % handles.var_names});
-fname = [handles.FileName_short '_' handles.MarkerLabel '.xls']; % ADD criteria¨smooth settings
-[fname,path] = uiputfile('*.xls', 'Select File to Write',[handles.PathName fname]);
-% ADD delete old file, if existing % ALT turn on overwrite
-% if exist([path fname],'file')
-%     
-% end
-% write file
-export(handles.exportdata,'XLSfile',[path fname],'Sheet',1);
-% turn of warning  % NOTE maybe there is a better place to do this?
-warning off MATLAB:xlswrite:AddSheet;
-% add worksheets with properties
-xlswrite([path fname], handles.filesummary, 2);
-% add worksheet with 'raw' data
-xlswrite([path fname], handles.seq_qs, 3);
-% change names of the worksheets
-xlsheets({'Data','Properties','Raw Data'}, [path fname]);
-warning on MATLAB:xlswrite:AddSheet;
+    % ADD change to 'dataset' have input for 'event' (3rd column) as text
+    handles.exportdata = dataset({handles.tabledata,...
+        handles.var_names{:}});
+    
+    fname = [handles.FileName_short '_' handles.MarkerLabel ...
+        '_smooth_' num2str(handles.smoothpnts) '_minVelo_' num2str(handles.minVelo) ...
+        '_minPause_' num2str(handles.minPause) '_minPeaks_' num2str(handles.minPeaks) ...
+        '_minFrames_' num2str(handles.minFrames) '.xls'];
+    [fname,path] = uiputfile('*.xls', 'Select File to Write',[handles.PathName fname]);
+    if fname~=0 % check if a filename is chosen
+        % check if .xls
+        [~, fending] = strtok(fname,'.');  % split into name and file ending
+        if strcmp(fending,'.xls')~=1
+            warndlg('Please save as a .xls File!', 'Wrong File Type');
+        else
+            
+            % ADD delete old file, if existing % ALT turn on overwrite
+            % if exist([path fname],'file')
+            %
+            % end
+            % write file
+            export(handles.exportdata,'XLSfile',[path fname],'Sheet',1);
+            % turn of warning  % NOTE maybe there is a better place to do this?
+            warning off MATLAB:xlswrite:AddSheet;
+            % add worksheets with properties
+            xlswrite([path fname], handles.filesummary, 2);
+            % add worksheet with 'raw' data
+            xlswrite([path fname], handles.seq_qs, 3);
+            % change names of the worksheets
+            xlsheets({'Data','Properties','Raw Data'}, [path fname]);
+            warning on MATLAB:xlswrite:AddSheet;
+        end
+    end
 end
-
-% pass on data to GUI
-guidata(hObject,handles);
-
-
-% --- Executes on button press in pushbuttonnicedata.
-function pushbuttonnicedata_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbuttonnicedata (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% set 'rawdata' table to invisible
-set(handles.uitableresultsraw,'Visible','off');
-
-% set 'nicedata' table to visible
-set(handles.uitableresults,'Visible','on');
-
-% enable 'rawdata' button
-set(handles.pushbuttonrawdata,'Enable','on');
-% disable 'nicedata' button
-set(handles.pushbuttonnicedata,'Enable','off');
-
-% pass on data to GUI
-guidata(hObject,handles);
-
-% --- Executes on button press in pushbuttonrawdata.
-function pushbuttonrawdata_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbuttonrawdata (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% set 'nicedata' table to invisible
-set(handles.uitableresults,'Visible','off');
-
-% set 'rawdata' table to visible
-set(handles.uitableresultsraw,'Visible','on');
-
-% enable 'nicedata' button
-set(handles.pushbuttonnicedata,'Enable','on');
-% disable 'rawdata' button
-set(handles.pushbuttonrawdata,'Enable','off');
-
 % pass on data to GUI
 guidata(hObject,handles);
 
@@ -573,6 +561,44 @@ if val==0
 else
    handles.WANDfactor = 2.5;    % CHECK Is it always 2.5? Any way to check this?     
 end
+
+% pass on data to GUI
+guidata(hObject,handles);
+
+% --- Executes when selected object is changed in buttongroupdatatab.
+function buttongroupdatatab_SelectionChangeFcn(hObject, eventdata, handles)
+% hObject    handle to the selected object in buttongroupdatatab 
+% eventdata  structure with the following fields (see UIBUTTONGROUP)
+%	EventName: string 'SelectionChanged' (read only)
+%	OldValue: handle of the previously selected object or empty if none was selected
+%	NewValue: handle of the currently selected object
+% handles    structure with handles and user data (see GUIDATA)
+
+switch get(eventdata.NewValue,'Tag') % Get Tag of selected object.
+    case 'radiobuttonnicedata'
+        % Code for when radiobutton1 is selected.
+        % set 'rawdata' table to invisible
+        set(handles.uitableresultsraw,'Visible','off');
+        
+        % set 'nicedata' table to visible
+        set(handles.uitableresults,'Visible','on');
+        
+        % % enable 'rawdata' button
+        % set(handles.pushbuttonrawdata,'Enable','on');
+        % % disable 'nicedata' button
+        % set(handles.pushbuttonnicedata,'Enable','off');
+  
+    case 'radiobuttonrawdata'
+        % Code for when radiobutton2 is selected.
+        % set 'nicedata' table to invisible
+        set(handles.uitableresults,'Visible','off');
+        
+        % set 'rawdata' table to visible
+        set(handles.uitableresultsraw,'Visible','on');
+    otherwise
+        % Code for when there is no match.
+end
+
 
 % pass on data to GUI
 guidata(hObject,handles);
