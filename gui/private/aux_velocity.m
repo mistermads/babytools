@@ -1,20 +1,24 @@
-function [speed,velocity,unit] = baby_velocity_c3d(raw_c3d,framerate,markername,smoothpnts)
-% BABY_VELOCITY_C3D
+function [speed,velocity,unit] = aux_velocity(raw_mat,framerate,markerindex,smoothpnts)
+% AUX_VELOCITY
 %
 %  Synopsis
 %  ========
 %
-%  [speed,velocity,unit] = baby_velocity_c3d(raw_c3d,framerate,markername)
-%  [speed,velocity,unit] = baby_velocity_c3d(raw_c3d,framerate,markername,smoothpnts)
+%  [speed,velocity,unit] = aux_velocity(raw_mat,framerate,markerindex)
+%  [speed,velocity,unit] = aux_velocity(raw_mat,framerate,markerindex,smoothpnts)
 % 
-%  -- Author: Mads Dyrholm --
+%   -- Author: Jan Bruemmerstedt --
+%      Department of Psychology, University of Copenhagen, Denmark.
+%      August 2013
+%
+%  -- based on a file by: Mads Dyrholm --
 %     Department of Psychology, University of Copenhagen, Denmark.
 %     August 2012
 %
 %  Purpose
 %  =======
 %  
-%  Compute marker velocity from loaded C3D file.
+%  Compute marker velocity from loaded MAT file (exported from qualisys).
 %
 %  Inputs
 %  ======
@@ -28,16 +32,22 @@ function [speed,velocity,unit] = baby_velocity_c3d(raw_c3d,framerate,markername,
 %  Smoothing set to emulate Qualisys 'second order curve' smoothing. Not 
 %  working around missing values yet.
 
+% NOTE: 'units' not stated, assumed to be 'mm' here
+raw_mat_units = 'mm';
+
 if nargin<4, smoothpnts = 0; end
 if mod(smoothpnts,2)==0
     error('Argument "smoothpnts" is not an odd number.');
 end
 
-smoothify = @smoothify_movingaverage
+smoothify = @smoothify_movingaverage;
 
 dt = 1/framerate;
 
-xyz = getfield(raw_c3d,markername);
+% load markerdata
+xyz = raw_mat.Trajectories.Labeled.Data(markerindex, 1:3, :);
+% reformating the matrix from 1 x 3 x NrFrames to NrFrames x 3
+xyz = permute(xyz, [3 2 1]);
 
 if smoothpnts>1
     prepost = floor(smoothpnts/2);
@@ -54,7 +64,7 @@ for idx = 2:N-1
     velocity(idx,:) = ( xyz(idx+1,:) - xyz(idx-1,:) ) / (2*dt);
 end
 speed = sqrt(sum(velocity.^2,2));
-unit = [raw_c3d.units '/s'];
+unit = [raw_mat_units '/s'];
 
 if prepost
     speed = smoothify(speed,prepost);
