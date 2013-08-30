@@ -12,7 +12,7 @@ var_names = {'Startframe','Endframe','Starttime_ms','Endtime_ms','Event'};
 starttimes = frames2msec(handles.startframes, handles.Framerate, handles.precision);
 endtimes = frames2msec(handles.endframes, handles.Framerate, handles.precision);
 % Unit or Pause
-eventstates = handles.seq_qs(1:end-1,2);
+eventstates = handles.seq_qs(1:end,2);
 % convert to cell array
 eventcell = cell(size(eventstates));
  eventcell(eventstates == 1) = {'Pause'};
@@ -34,7 +34,9 @@ handles.eventstates = eventstates;
 
 %% fill 'framedata' table with data of each single frame
 var_names_frame = {'Frame', 'Event', 'Velocity','Extrema'};
-seq_frame = baby_seq_expand(handles.seq_qs);
+% expand the seq unit-wise data to frame-wise data (the nan's at the end
+% are discarded!)
+seq_frame = baby_seq_expand(handles.seq_qs);  
 eventcellframe = cell(length(seq_frame),1);
  eventcellframe(seq_frame(:,2) == 1) = {'Pause'};
  eventcellframe(seq_frame(:,2) == 2) = {'Unit'};
@@ -42,10 +44,15 @@ eventcellframe = cell(length(seq_frame),1);
 peaksndipscell = cell(length(seq_frame),1);
 peaksndipscell(handles.peakIdxs) = {'Peak'};
 peaksndipscell(handles.dipIdxs) = {'Dip'};
+
 % compute percentage of missing, unit and pause data
-perc_missing = sum(isnan(seq_frame(:,2)))/handles.Frames;
+perc_missing = sum(isnan(handles.frame_velo))/handles.Frames; % use frame_velo, since it has still all nan's
 perc_pause = sum((seq_frame(:,2) == 1))/handles.Frames;
 perc_unit = sum((seq_frame(:,2) == 2))/handles.Frames;
+
+% shorten frame_velo to fit with expanded seq (which is shorter because of
+% the discarded nan's)
+handles.frame_velo = handles.frame_velo(1:length(seq_frame),1);
 tabledata_frame = [num2cell(seq_frame(:,1)) eventcellframe num2cell(handles.frame_velo) peaksndipscell];
 set(handles.uitableresultsframe,'Data',tabledata_frame);
 set(handles.uitableresultsframe,'ColumnName',var_names_frame);

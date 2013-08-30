@@ -117,8 +117,8 @@ handles.trueUnitsIdxs = find(seq_qs(:,2)==2);
 handles.trueNrUnits = length(handles.trueUnitsIdxs);
 
 % compute start- and end frames
-handles.startframes = handles.seq_qs(1:end-1,1);
-handles.endframes = handles.seq_qs(2:end,1)-1;
+handles.startframes = handles.seq_qs(1:end,1);
+handles.endframes = [handles.seq_qs(2:end,1)-1; handles.Frames];
 
 % compute additional unit statistics
 % Nr of Peaks and average height of peaks per unit
