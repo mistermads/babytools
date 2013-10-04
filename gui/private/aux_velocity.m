@@ -7,14 +7,22 @@ function [speed,velocity,unit] = aux_velocity(raw_mat,framerate,markerindex,smoo
 %  [speed,velocity,unit] = aux_velocity(raw_mat,framerate,markerindex)
 %  [speed,velocity,unit] = aux_velocity(raw_mat,framerate,markerindex,smoothpnts)
 % 
-%  -- Author: Mads Dyrholm --
+%   -- Author: Jan Bruemmerstedt --
+%      Department of Psychology, University of Copenhagen, Denmark.
+%      August 2013
+%
+%  -- based on a file by: Mads Dyrholm --
 %     Department of Psychology, University of Copenhagen, Denmark.
 %     August 2012
 %
 %  Purpose
 %  =======
 %  
+<<<<<<< HEAD
 %  Compute marker velocity from loaded MAT file.
+=======
+%  Compute marker velocity from loaded MAT file (exported from qualisys).
+>>>>>>> origin/jans2te
 %
 %  Inputs
 %  ======
@@ -41,9 +49,14 @@ smoothify = @smoothify_movingaverage;
 dt = 1/framerate;
 
 % load markerdata
+<<<<<<< HEAD
 % NOTE: only loads labeled data so far, ignores all other!
 xyz = raw_mat.Trajectories.Labeled.Data(markerindex, 1:3, :);
 % reformating the matrix from 1 x 3 x length_of_data to length_of_data x 3
+=======
+xyz = raw_mat.Trajectories.Labeled.Data(markerindex, 1:3, :);
+% reformating the matrix from 1 x 3 x NrFrames to NrFrames x 3
+>>>>>>> origin/jans2te
 xyz = permute(xyz, [3 2 1]);
 
 if smoothpnts>1
